@@ -1,0 +1,62 @@
+/*
+ * Copyright 2024 Carlos
+ *
+ */
+
+/dts-v1/;
+
+/ {
+	description = "arm64 kernel, ramdisk and FDT blob";
+	#address-cells = <1>;
+
+	images {
+		kernel {
+			description = "ARM64 Kernel";
+			data = /incbin/("../linux/arch/arm64/boot/Image.gz");
+			type = "kernel";
+			arch = "arm64";
+			os = "linux";
+			compression = "gzip";
+			load = <0x00080000>;
+			entry = <0x00080000>;
+			hash {
+				algo = "sha256";
+			};
+			signature {
+				algo = "sha256,rsa2048";
+				key-name-hint = "dev";
+			};
+		};
+
+		raspi4b-dtb {
+			description = "raspi4b-dtb";
+			data = /incbin/("../linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb");
+			type = "flat_dt";
+			arch = "arm64";
+			os = "linux";
+			compression = "none";
+			load = <0x02600000>;
+            hash {
+                algo = "sha256";
+            };
+            signature {
+                algo = "sha256,rsa2048";
+                key-name-hint = "dev";
+            };
+		};
+	};
+
+	configurations {
+        default = "raspberrypi-os-64";
+		raspberrypi-os-64 {
+			description = "Boot kernel with FDT blob (Raspberry Pi OS 64-bit)";
+			kernel = "kernel";
+			fdt = "raspi4b-dtb";
+			signature {
+				algo = "sha256,rsa2048";
+				key-name-hint = "dev";
+				sign-images = "kernel", "fdt";
+			};
+		};
+	};
+};

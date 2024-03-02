@@ -1,0 +1,12 @@
+[submodule "bsp/linux"]
+	path = bsp/linux
+	url = https://github.com/raspberrypi/linux
+[submodule "bsp/u-boot"]
+	path = bsp/u-boot
+	url = https://github.com/u-boot/u-boot
+[submodule "bsp/firmware"]
+	path = bsp/firmware
+	url = https://github.com/raspberrypi/firmware
+[submodule "bsp/rpi-buildroot"]
+	path = bsp/rpi-buildroot
+	url = https://github.com/gamaral/rpi-buildroot.git
