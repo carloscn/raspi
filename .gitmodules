@@ -10,3 +10,6 @@
 [submodule "bsp/rpi-buildroot"]
 	path = bsp/rpi-buildroot
 	url = https://github.com/gamaral/rpi-buildroot.git
+[submodule "bsp/arm-trusted-firmware"]
+	path = bsp/arm-trusted-firmware
+	url = https://github.com/ARM-software/arm-trusted-firmware.git

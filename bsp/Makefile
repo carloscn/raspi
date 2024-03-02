@@ -9,6 +9,7 @@ KERNEL_IMAGE := linux/arch/arm64/boot/Image.gz
 DTB_IMAGE := linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb
 RAMDISK := rootfs_lsdk2012_yocto_tiny_arm64.cpio.gz
 ROOTFSDISK := 2023-12-11-raspios-bookworm-arm64-lite.img.xz
+BL31 := arm-trusted-firmware/build/rpi4/debug/bl31.bin
 
 .PHONY: clean rootfs
 
@@ -16,7 +17,9 @@ prepare:
 	git submodule init
 	git submodule update --progress --depth=1
 
-image: $(UBOOT) $(KERNEL) $(DTB_IMAGE) $(BOOT_SCR)
+$(BL31): tfa
+
+image: $(UBOOT) $(KERNEL) $(DTB_IMAGE) $(BOOT_SCR) $(BL31)
 
 u-boot:
 	cp -rfv configs/rpi_4_user_defconfig u-boot/configs/
@@ -27,6 +30,10 @@ u-boot:
 
 bootscr:
 	mkimage -C none -A arm64 -T script -d configs/boot.cmd boot.scr
+
+tfa:
+	cd arm-trusted-firmware && export CROSS_COMPILE=${CROSS_PREFIX} && \
+		make PLAT=rpi4 DEBUG=1 LOG_LEVEL=50 -j16
 
 linux:
 	cd linux && export KERNEL=kernel8 && \
@@ -72,7 +79,7 @@ $(UBOOT): u-boot
 
 $(ROOTFSDISK): rootfs
 
-sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT)
+sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 	-sudo umount ${SD_DEV}1
 	-sudo umount ${SD_DEV}2
 	rm -rf boot rootfs && mkdir -p boot rootfs
@@ -88,6 +95,7 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT)
 	sudo cp -rfv firmware/boot/start4.elf boot
 	sudo cp -rfv firmware/boot/bootcode.bin boot
 	sudo cp -rfv configs/config.txt boot
+	sudo cp -rfv $(BL31) boot
 	@echo "[INFO] Create username:${USER_NAME} and password:123456 for rootfs"
 	echo "${USER_NAME}:$(openssl passwd -6 -stdin <<<'123456')" > userconf.txt
 	sudo cp -rfv userconf.txt boot && rm -rf userconf.txt

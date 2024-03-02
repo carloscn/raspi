@@ -11,7 +11,8 @@
 
 # Enable 64-bit support
 arm_64bit=1
-
+enable_gic=1
+armstub=bl31.bin
 #kernel=kernel8.img
 
 # We always use the same names. The variant is selected in fwup.conf.
