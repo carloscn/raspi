@@ -6,3 +6,4 @@ firmware
 2023-12-11-raspios-bookworm-arm64-lite.img*
 image.ub
 boot.scr
+.vscode
