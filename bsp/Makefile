@@ -11,7 +11,7 @@ RAMDISK := rootfs_lsdk2012_yocto_tiny_arm64.cpio.gz
 ROOTFSDISK := 2023-12-11-raspios-bookworm-arm64-lite.img.xz
 BL31 := arm-trusted-firmware/build/rpi4/debug/bl31.bin
 
-.PHONY: clean rootfs
+.PHONY: clean rootfs u-boot linux
 
 prepare:
 	git submodule init
@@ -41,7 +41,7 @@ linux:
 		make ARCH=arm64 CROSS_COMPILE=${CROSS_PREFIX} -j16
 
 ramdisk:
-	aria2c -x5 "${RAMDISK_TAR}" || rm -rf ${RAMDISK_TAR} && ls ${RAMDISK_TAR}
+	aria2c -x5 "${RAMDISK_TAR}" || rm -rf ${RAMDISK} && ls ${RAMDISK}
 	ln -s rootfs_lsdk2012_yocto_tiny_arm64.cpio.gz ramdisk.cpio.gz
 
 rootfs:
@@ -53,23 +53,41 @@ $(DTB_IMAGE): linux
 
 $(RAMDISK): ramdisk
 
-fit: $(KERNEL_IMAGE) $(DTB_IMAGE) $(RAMDISK)
-	openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:2048 -pkeyopt rsa_keygen_pubexp:65537
-	openssl req -batch -new -x509 -key keys/dev.key -out keys/dev.crt
-	openssl rsa -in keys/dev.key -pubout
-	cp -rfv linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb
-	mkimage -f configs/raspi.its -K linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb -k keys image.ub
-	sha256sum image.ub
-
 fit_noram: $(KERNEL_IMAGE) $(DTB_IMAGE)
 	@echo "[INFO] Gen key."
 	openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:2048 -pkeyopt rsa_keygen_pubexp:65537
 	openssl req -batch -new -x509 -key keys/dev.key -out keys/dev.crt
 	openssl rsa -in keys/dev.key -pubout
 	@echo "[INFO] Backup dtb. because mkimage will change dtb file."
+	# ==> Please note that, Rapsi 4B board will read the linux device tree from the boot partition of the SD card instead of uboot's FDT.
+	# ==> Therefore, the uboot FDT will be bypassed. I have provided a common method for creating uboot fdt as follows:
+	# ==>  cp -rfv u-boot/arch/arm/dts/bcm2711-rpi-4-b.dtb u-boot/arch/arm/dts/bcm2711-rpi-4-b-signature.dtb
+	# ==> ./u-boot/tools/mkimage -f configs/raspi_noramdisk.its -k keys -K u-boot/arch/arm/dts/bcm2711-rpi-4-b-signature.dtb -r image.ub
+	# ==> Ops!!! In order to adapt the Rapsi 4B board, I have to create a dtb with public key using Linux's device tree.
+	# ==> Then, copy the ..../bcm2711-rpi-4-b-signature.dtb to the boot partition of the SD card and rename it to bcm2711-rpi-4-b.dtb
 	cp -rfv linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb
-	mkimage -f configs/raspi_noramdisk.its -K linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb -k keys image.ub
+	./u-boot/tools/mkimage -f configs/raspi_noramdisk.its -k keys -K linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb -r image.ub
+	cp -rfv linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb bcm2711-rpi-4-b.dtb
 	sha256sum image.ub
+	./u-boot/tools/fit_check_sign -f image.ub -k bcm2711-rpi-4-b.dtb
+	@echo "[INFO] Rebuild U-boot to add fdt to uboot.bin."
+	# ==> Ops!!! It is not nessasery to Rapsi 4B board, but to a normal hardware platform.
+	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=arch/arm/dts/bcm2711-rpi-4-b-signature.dtb make -j16
+	@echo "[INFO] !!!!! Please remember to copy bcm2711-rpi-4-b.dtb to your boot partition of your sd card!!! The public key is in bcm2711-rpi-4-b.dtb"
+
+fit: $(KERNEL_IMAGE) $(DTB_IMAGE)
+	openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:2048 -pkeyopt rsa_keygen_pubexp:65537
+	openssl req -batch -new -x509 -key keys/dev.key -out keys/dev.crt
+	openssl rsa -in keys/dev.key -pubout
+	cp -rfv linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb
+	./u-boot/tools/mkimage -f configs/raspi.its -k keys -K linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb -r image.ub
+	cp -rfv linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb bcm2711-rpi-4-b.dtb
+	sha256sum image.ub
+	./u-boot/tools/fit_check_sign -f image.ub -k bcm2711-rpi-4-b.dtb
+	@echo "[INFO] Rebuild U-boot to add fdt to uboot.bin."
+	# ==> Ops!!! It is not nessasery to Rapsi 4B board, but to a normal hardware platform.
+	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=arch/arm/dts/bcm2711-rpi-4-b-signature.dtb make -j16
+	@echo "[INFO] !!!!! Please remember to copy bcm2711-rpi-4-b.dtb to your boot partition of your sd card!!! The public key is in bcm2711-rpi-4-b.dtb"
 
 $(BOOT_SCR): bootscr
 
@@ -91,7 +109,7 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 	sudo mount ${SD_DEV}2 rootfs
 	sudo rm -rf boot/* && sync
 	@echo "[INFO] Copying boot binaries to sd card."
-	#sudo cp -rfv firmware/boot/bcm2711-rpi-4-b.dtb boot
+	sudo cp -rfv bcm2711-rpi-4-b.dtb boot
 	sudo cp -rfv firmware/boot/start4.elf boot
 	sudo cp -rfv firmware/boot/bootcode.bin boot
 	sudo cp -rfv configs/config.txt boot
@@ -112,7 +130,7 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 	rm -rf boot rootfs
 
 clean:
-	rm -rf boot.scr ramdisk.cpio.gz root.tar.xz root.tar.xz
+	rm -rf boot.scr ramdisk.cpio.gz root.tar.xz root.tar.xz bcm2711-rpi-4-b.dtb
 	rm -rf image.ub rootfs_lsdk2012_yocto_tiny_arm64.cpio.gz
 	rm -rf keys/dev.*
 

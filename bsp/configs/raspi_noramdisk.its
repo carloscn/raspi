@@ -30,7 +30,7 @@
 
 		raspi4b-dtb {
 			description = "raspi4b-dtb";
-			data = /incbin/("../linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb");
+			data = /incbin/("../linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b.dtb");
 			type = "flat_dt";
 			arch = "arm64";
 			os = "linux";
@@ -55,7 +55,7 @@
 			signature {
 				algo = "sha256,rsa2048";
 				key-name-hint = "dev";
-				sign-images = "kernel", "fdt";
+				sign-images = "fdt", "kernel";
 			};
 		};
 	};

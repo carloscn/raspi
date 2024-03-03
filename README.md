@@ -71,3 +71,35 @@ booti $kernel_addr_r - $fdt_addr_r
 fatload mmc 0:1 4000000 image.ub
 bootm 4000000
 ```
+
+# 5. uboot验签
+
+uboot验签kernel这块真的是超级让我费解：
+* BUG1： 经过测试，错误的public key，甚至没有public key居然在uboot验签阶段可以启动！
+* BUG2：在设备树里面读不到正确的public key。
+
+根据uboot的签名和验签的机制，签名是在host的mkimage完成的，然后使用-K参数制定uboot的二进制fdt，mkimage会自动把public key导入到uboot的fdt中，然后使用 EXT_DTB=设备树 make 把带有公钥的fdt导入到boot.bin中。
+
+这样uboot启动的时候，会从boot.bin中的fdt读取到public key然后会去校验fit_image中signature。
+
+调试的时候发现一个非常让人费解的问题，我用不同的key去签，然后不更新uboot.bin中的公钥，我发现居然可以启动到内核。ops！！！
+
+后来发现，uboot的逻辑，是否验证通过都会往下走！（好奇怪的设定），我理解kernel验证失败了，压根就不能启动啊！我尝试加log看看为什么会返回，查看到底哪里失败了。如下log是我调试打印出来的， 发现怎么都找不到signature的节点：
+
+![](https://raw.githubusercontent.com/carloscn/images/main/typora202403031047853.png)
+
+这里返回是0，所以这里的逻辑非常粗暴，就是如果没有signature的节点，成功。
+
+![](https://raw.githubusercontent.com/carloscn/images/main/typoratyporatypora202403031034197.png)
+
+其实这里应该做更丰富的逻辑判断，如果用户使能FULL check，而且没有找到key的节点，那么就返回EPERM错误。否则，uboot验签有啥用！
+
+好吧，通过改这个code，可以拦截住错误的key了。然后我们再查一下，为什么会没有signature节点。
+
+我是本地的check_sign工具可以验证image.ub通过呀！受到这个帖子的启发 ： https://www.mail-archive.com/u-boot@lists.denx.de/msg417296.html  我才发现，树莓派这个设定真的是。。。树莓派的上层bootrom会bybpass掉uboot.bin中的fdt，而使用sd卡boot分区的linux的dtb。 而我sd卡中存储的dtb是树莓派出厂的dtb，所以没有任何的public key啊！
+
+我尝试mkimage的时候 -K去给uboot的fdt添加，然后拷贝到sd卡，树莓派板子无法启动。我只能给linux的dtb添加public key，然后拷贝sd卡，结果板子可以启动了，也可以验签了。
+
+![](https://raw.githubusercontent.com/carloscn/images/main/typoratypora202403031045031.png)
+
+真的是让人非遗思索的设计！再一次证明，嵌入式必须一个平台一个说法。
