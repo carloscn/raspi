@@ -29,7 +29,7 @@ u-boot:
 	@echo "[INFO] uboot build!"
 
 bootscr:
-	mkimage -C none -A arm64 -T script -d configs/boot.cmd boot.scr
+	./u-boot/tools/mkimage -C none -A arm64 -T script -d configs/boot.cmd boot.scr
 
 tfa:
 	cd arm-trusted-firmware && export CROSS_COMPILE=${CROSS_PREFIX} && \
@@ -72,7 +72,7 @@ fit_noram: $(KERNEL_IMAGE) $(DTB_IMAGE)
 	./u-boot/tools/fit_check_sign -f image.ub -k bcm2711-rpi-4-b.dtb
 	@echo "[INFO] Rebuild U-boot to add fdt to uboot.bin."
 	# ==> Ops!!! It is not nessasery to Rapsi 4B board, but to a normal hardware platform.
-	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=arch/arm/dts/bcm2711-rpi-4-b-signature.dtb make -j16
+	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=../linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb make -j16
 	@echo "[INFO] !!!!! Please remember to copy bcm2711-rpi-4-b.dtb to your boot partition of your sd card!!! The public key is in bcm2711-rpi-4-b.dtb"
 
 fit: $(KERNEL_IMAGE) $(DTB_IMAGE)
@@ -86,7 +86,7 @@ fit: $(KERNEL_IMAGE) $(DTB_IMAGE)
 	./u-boot/tools/fit_check_sign -f image.ub -k bcm2711-rpi-4-b.dtb
 	@echo "[INFO] Rebuild U-boot to add fdt to uboot.bin."
 	# ==> Ops!!! It is not nessasery to Rapsi 4B board, but to a normal hardware platform.
-	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=arch/arm/dts/bcm2711-rpi-4-b-signature.dtb make -j16
+	cd u-boot && export CROSS_COMPILE=${CROSS_PREFIX} && EXT_DTB=../linux/arch/arm64/boot/dts/broadcom/bcm2711-rpi-4-b-signature.dtb make -j16
 	@echo "[INFO] !!!!! Please remember to copy bcm2711-rpi-4-b.dtb to your boot partition of your sd card!!! The public key is in bcm2711-rpi-4-b.dtb"
 
 $(BOOT_SCR): bootscr
