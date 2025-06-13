@@ -13,3 +13,6 @@
 [submodule "bsp/arm-trusted-firmware"]
 	path = bsp/arm-trusted-firmware
 	url = https://github.com/ARM-software/arm-trusted-firmware.git
+[submodule "can_example/can-isotp"]
+	path = can_example/can-isotp
+	url = https://github.com/hartkopp/can-isotp.git
