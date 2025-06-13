@@ -78,7 +78,7 @@ enable_uart=1
 #max_framebuffers=2
 
 # Enable CAN Bus
-#dtoverlay=mcp2515-can0,oscillator=8000000,interrupt=25
+dtoverlay=mcp2515-can0,oscillator=12000000,interrupt=25,spimaxfrequency=2000000
 
 [all]
 max_framebuffer_width=1080

@@ -136,6 +136,8 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 	@echo -e "$(BLUE)[INFO]$(NC) Copying boot script and kernel."
 	@sudo -E cp -f $(BOOT_SCR) boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy $(BOOT_SCR)."; exit 1; }
 	@sudo -E cp -f $(KERNEL) boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy $(KERNEL)."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Copying ssh boot script."
+	@sudo -E cp -f configs/ssh boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy ssh."; exit 1; }
 	@echo -e "$(BLUE)[INFO]$(NC) Syncing and unmounting."
 	@sync || { echo -e "$(RED)[ERROR]$(NC) Sync failed."; exit 1; }
 	@sudo -E umount $(SD_DEV)1 || { echo -e "$(RED)[ERROR]$(NC) Failed to unmount $(SD_DEV)1."; exit 1; }
@@ -143,6 +145,37 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 	@echo -e "$(BLUE)[INFO]$(NC) Cleaning up temporary directories."
 	@rm -rf boot rootfs
 	@echo -e "$(GREEN)[SUCCESS]$(NC) SD card preparation completed."
+
+# Prepare SD card
+sd-raspi: $(ROOTFSDISK)
+	@echo -e "$(BLUE)[INFO]$(NC) Unmounting $(SD_DEV)1 and $(SD_DEV)2 if mounted."
+	@sudo -E umount $(SD_DEV)1 2>/dev/null || true
+	@sudo -E umount $(SD_DEV)2 2>/dev/null || true
+	@echo -e "$(BLUE)[INFO]$(NC) Setting up temporary directories."
+	@rm -rf boot rootfs
+	@mkdir -p boot rootfs || { echo -e "$(RED)[ERROR]$(NC) Failed to create boot/rootfs directories."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Decompressing $(ROOTFSDISK).xz."
+	@xz -k -f -d "$(ROOTFSDISK).xz" || { echo -e "$(RED)[ERROR]$(NC) Failed to decompress $(ROOTFSDISK).xz."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Writing image to $(SD_DEV)."
+	@sudo -E dd if=$(ROOTFSDISK) of=$(SD_DEV) bs=32M status=progress || { echo -e "$(RED)[ERROR]$(NC) Failed to write image to $(SD_DEV)."; exit 1; }
+	@sync || { echo -e "$(RED)[ERROR]$(NC) Sync failed after dd."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Mounting $(SD_DEV)1 and $(SD_DEV)2."
+	@sudo -E mount $(SD_DEV)1 boot || { echo -e "$(RED)[ERROR]$(NC) Failed to mount $(SD_DEV)1."; exit 1; }
+	@sudo -E mount $(SD_DEV)2 rootfs || { echo -e "$(RED)[ERROR]$(NC) Failed to mount $(SD_DEV)2."; exit 1; }
+	@sudo -E cp -f configs/config.txt boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy config.txt."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Creating user $(USER_NAME) with password."
+	@echo "$(USER_NAME):$$(openssl passwd -6 -stdin <<< '$(PASSWD)')" > userconf.txt || { echo -e "$(RED)[ERROR]$(NC) Failed to create userconf.txt."; exit 1; }
+	@sudo -E cp -f userconf.txt boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy userconf.txt."; exit 1; }
+	@rm -f userconf.txt
+	@echo -e "$(BLUE)[INFO]$(NC) Copying ssh boot script."
+	@sudo -E cp -f configs/ssh boot/ || { echo -e "$(RED)[ERROR]$(NC) Failed to copy ssh."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Syncing and unmounting."
+	@sync || { echo -e "$(RED)[ERROR]$(NC) Sync failed."; exit 1; }
+	@sudo -E umount $(SD_DEV)1 || { echo -e "$(RED)[ERROR]$(NC) Failed to unmount $(SD_DEV)1."; exit 1; }
+	@sudo -E umount $(SD_DEV)2 || { echo -e "$(RED)[ERROR]$(NC) Failed to unmount $(SD_DEV)2."; exit 1; }
+	@echo -e "$(BLUE)[INFO]$(NC) Cleaning up temporary directories."
+	@rm -rf boot rootfs
+	@echo -e "$(GREEN)[SUCCESS]$(NC) SD card preparation completed. default user: [$(USER_NAME)], passwd: [$(PASSWD)]"
 
 # Clean build artifacts
 clean:
