@@ -43,6 +43,12 @@ https://data.engrie.be/RaspberryPi/Raspberry_Pi_-_Part_16_-_Devices_Partitions_a
 
 # 3. bsp编译
 
+远程构建从仓库根目录执行 `make ci`。它会检查工具链、编译 U-Boot / kernel / TF-A / FIT，并把产物写到 `RB_OUT`。不写 SD 卡。
+
+交叉编译器放在 `$RB_INPUTS/bin/aarch64-none-linux-gnu-gcc`，或者已经在 `PATH` 上。也可以自己 `export CROSS_PREFIX=...`。
+
+写卡是 `make hw-sd`，需要另外设置 `SD_DEV`。`make ci` 不会调用它。
+
 本仓库已经把所有的kernel和uboot以及firmware都准备好了，直接可以`make prepare` -> `make image`。
 
 ## 3.1 编译uboot

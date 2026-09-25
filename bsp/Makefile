@@ -2,6 +2,18 @@
 include build.cfg
 export $(shell sed 's/=.*//' build.cfg)
 
+ifeq ($(strip $(CROSS_PREFIX)),)
+  ifneq ($(RB_INPUTS),)
+    ifneq ($(wildcard $(RB_INPUTS)/bin/aarch64-none-linux-gnu-gcc),)
+      CROSS_PREFIX := $(RB_INPUTS)/bin/aarch64-none-linux-gnu-
+    endif
+  endif
+endif
+ifeq ($(strip $(CROSS_PREFIX)),)
+  CROSS_PREFIX := aarch64-none-linux-gnu-
+endif
+export CROSS_PREFIX
+
 # Use bash as the shell for consistent behavior
 SHELL := /bin/bash
 
@@ -23,16 +35,28 @@ BLUE=\033[0;34m
 NC=\033[0m
 
 # Phony targets (not associated with files)
-.PHONY: all prepare u-boot bootscr tfa linux ramdisk rootfs fit clean distclean sd image
+.PHONY: all prepare u-boot bootscr tfa linux ramdisk rootfs fit clean distclean sd image config-check
 
 # Default target
 all: image sd
 
-# Initialize and update submodules
+# Initialize and update submodules. Firmware keeps only its boot/ tree.
 prepare:
 	@echo -e "$(BLUE)[INFO]$(NC) Initializing and updating submodules."
-	@git submodule init
-	@git submodule update --progress --depth=1 --jobs=4 || { echo -e "$(RED)[ERROR]$(NC) Failed to update submodules."; exit 1; }
+	@git submodule update --init --depth=1 --jobs=4 || { echo -e "$(RED)[ERROR]$(NC) Failed to update submodules."; exit 1; }
+	@git -C firmware sparse-checkout init --cone
+	@git -C firmware sparse-checkout set boot
+	@echo -e "$(GREEN)[SUCCESS]$(NC) Submodules ready."
+
+config-check:
+	@set -e; \
+	command -v git >/dev/null || { echo "git is missing"; exit 1; }; \
+	command -v openssl >/dev/null || { echo "openssl is missing"; exit 1; }; \
+	command -v bc >/dev/null || { echo "bc is missing"; exit 1; }; \
+	command -v flex >/dev/null || { echo "flex is missing"; exit 1; }; \
+	command -v bison >/dev/null || { echo "bison is missing"; exit 1; }; \
+	command -v "$(CROSS_PREFIX)gcc" >/dev/null || { echo "compiler not found: $(CROSS_PREFIX)gcc"; echo "Put it on PATH, or under \$$RB_INPUTS/bin/, or export CROSS_PREFIX."; exit 1; }; \
+	echo "toolchain: $$("$(CROSS_PREFIX)gcc" -dumpmachine)"
 
 # Build U-Boot
 u-boot:
@@ -104,6 +128,7 @@ image: $(UBOOT) $(BOOT_SCR) $(KERNEL) $(DTB_IMAGE) $(BL31)
 
 # Prepare SD card
 sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
+	@test -n "$(SD_DEV)" || { echo "SD_DEV is not set. This writes a card and is not part of make ci."; exit 1; }
 	@echo -e "$(BLUE)[INFO]$(NC) Unmounting $(SD_DEV)1 and $(SD_DEV)2 if mounted."
 	@sudo -E umount $(SD_DEV)1 2>/dev/null || true
 	@sudo -E umount $(SD_DEV)2 2>/dev/null || true
@@ -148,6 +173,7 @@ sd: $(ROOTFSDISK) $(BOOT_SCR) $(KERNEL) $(UBOOT) $(BL31)
 
 # Prepare SD card
 sd-raspi: $(ROOTFSDISK)
+	@test -n "$(SD_DEV)" || { echo "SD_DEV is not set. This writes a card and is not part of make ci."; exit 1; }
 	@echo -e "$(BLUE)[INFO]$(NC) Unmounting $(SD_DEV)1 and $(SD_DEV)2 if mounted."
 	@sudo -E umount $(SD_DEV)1 2>/dev/null || true
 	@sudo -E umount $(SD_DEV)2 2>/dev/null || true
